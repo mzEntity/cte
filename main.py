@@ -1,6 +1,8 @@
 from utils.cursor import Cursor, CursorPosition, cprint
 from utils.interactive import getch
 
+from layout.board import Board
+
 class MyVim:
     def __init__(self):
         self._mode = 'normal'

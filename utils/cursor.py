@@ -79,6 +79,8 @@ class Cursor:
         self._set(cp)
         
         
+        
+        
 def cprint(message: str):
     lines = message.split("\n")
     # print(lines)
