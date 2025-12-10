@@ -23,19 +23,19 @@ def getch():
     }
     
     if bytes_input in control_dict:
-        return control_dict[bytes_input]
+        return control_dict[bytes_input], "control"
     
     for encoding in ['utf-8']:
         try:
             s = bytes_input.decode(encoding)
-            return s
+            return s, encoding
         except UnicodeDecodeError:
             continue
-    return "UNKNOWN"
+    return "null", "unknown"
 
 
 if __name__ == "__main__":
     print('Press 10 keys: ')
     for i in range(10):
-        result = getch()
-        print(result)
+        result, source = getch()
+        print(f"'{result}' <- {source}")

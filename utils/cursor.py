@@ -40,15 +40,31 @@ class Cursor:
     def position(self):
         return CursorPosition(self._cursor_x, self._cursor_y)
     
-    def offset(self, cp: CursorPosition):
+    def _offset(self, cp: CursorPosition):
         return cp.pos_x - self._cursor_x, cp.pos_y - self._cursor_y
     
-    def set(self, cp: CursorPosition):
+    def _set(self, cp: CursorPosition):
         self._cursor_x = cp.pos_x
         self._cursor_y = cp.pos_y
         
+    def up(self):
+        _move_cursor_up(1)
+        self._cursor_x -= 1
+        
+    def down(self):
+        _move_cursor_down(1)
+        self._cursor_x += 1
+        
+    def left(self):
+        _move_cursor_left(1)
+        self._cursor_y -= 1
+        
+    def right(self):
+        _move_cursor_right(1)
+        self._cursor_y += 1
+        
     def goto(self, cp: CursorPosition):
-        offset_x, offset_y = self.offset(cp)
+        offset_x, offset_y = self._offset(cp)
         
         if offset_x > 0:
             _move_cursor_down(offset_x)       
@@ -60,11 +76,12 @@ class Cursor:
         elif offset_y < 0:
             _move_cursor_left(-offset_y)
         
-        self.set(cp)
+        self._set(cp)
         
         
 def cprint(message: str):
     lines = message.split("\n")
+    # print(lines)
     line_count = len(lines)
     enter_count = line_count - 1
     if line_count == 0:
@@ -84,14 +101,14 @@ def cprint(message: str):
 def _cprint_within_line(message: str):
     length = len(message)
     Cursor()._cursor_y += length
-    print(message, end="")
+    print(message, end="", flush=True)
     
     
     
 def _cnewline(n: int):
     Cursor()._cursor_x += n
     Cursor()._cursor_y = 0
-    print("\n" * n, end="")
+    print("\n" * n, end="", flush=True)
     
     
     
