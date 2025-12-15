@@ -19,7 +19,9 @@ def getch():
         b'\xe0P': "DOWN",
         b'\xe0K': "LEFT",
         b'\xe0M': "RIGHT",
-        b'\x1b': "ESC"
+        b'\x1b': "ESC",
+        b'\x08': "BACKSPACE",
+        b'\r': "ENTER"
     }
     
     if bytes_input in control_dict:
@@ -37,5 +39,7 @@ def getch():
 if __name__ == "__main__":
     print('Press 10 keys: ')
     for i in range(10):
-        result, source = getch()
-        print(f"'{result}' <- {source}")
+        # result, source = getch()
+        # print(f"'{result}' <- {source}")
+        got_list = _getch()
+        print(got_list)

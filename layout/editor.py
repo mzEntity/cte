@@ -27,7 +27,7 @@ class Editor:
     
     def update_display(self):
         self._update_display_content()
-        self._update_padded_display_content()
+        self._update_display_content_padded()
         
         
     def show_cursor(self):
@@ -37,26 +37,27 @@ class Editor:
         
         
     def _update_display_content(self):
+        self._display_content_packed = self._dm.get_display_content_within_width(self._cm.get_content()) 
         self._display_content = [
             line 
-            for split_result in self._dm.get_display_content_within_width(self._cm.get_content()) 
+            for split_result in self._display_content_packed
             for line in split_result
         ]
         
-    def _update_padded_display_content(self):
-        self._padded_display_content = []
+    def _update_display_content_padded(self):
+        self._display_content_padded = []
         for line in self._display_content:
             new_line = line[:]
             if len(line) < self._width:
                 new_line += ' ' * (self._width - len(line))
-            self._padded_display_content.append(new_line)
-        if self._height > len(self._padded_display_content):
-            self._padded_display_content.extend([' ' * self._width] * (self._height - len(self._padded_display_content)))
+            self._display_content_padded.append(new_line)
+        if self._height > len(self._display_content_padded):
+            self._display_content_padded.extend([' ' * self._width] * (self._height - len(self._display_content_padded)))
             
         
     def show(self):
         Cursor().goto(self._base)
-        display_list = self._padded_display_content[self._display_x_begin:self._display_x_end]
+        display_list = self._display_content_padded[self._display_x_begin:self._display_x_end]
         
         for display_line in display_list:
             cprint(display_line)
@@ -108,9 +109,35 @@ class Editor:
                 self._display_x_begin = self._display_x_end - self._height
                 self.show()
             
+    # TODO: need refactor 以下顺序不能改变
+    def insert_char(self, c: char):
+        cx, cy = self._dm.display_index_to_content_index(self._display_cursor_x, self._display_cursor_y, self._display_content_packed)
+        self._cm.insert_str(cx, cy, c)
+        self.update_display()
+        self.display_cursor_right()
+        self.show()
         
+        
+    def delete_char(self):
+        cx, cy = self._dm.display_index_to_content_index(self._display_cursor_x, self._display_cursor_y, self._display_content_packed)
+        self.display_cursor_left()
+        if cx != 0 and cy == 0:
+            self._cm.combine_line(cx)
+            self.update_display()
+            self.show()
+        else:
+            self._cm.delete_str(cx, cy, 1)
+            self.update_display()
+            self.show()
             
-
+        
+    def insert_line(self):
+        cx, cy = self._dm.display_index_to_content_index(self._display_cursor_x, self._display_cursor_y, self._display_content_packed)
+        self._cm.insert_line(cx, cy)
+        self.update_display()
+        self.display_cursor_right()
+        self.show()
+        
 
 class ContentManager:
     def __init__(self, content: Optional[List[str]] = None):
@@ -170,16 +197,17 @@ class DisplayManager:
         self.width = width
         
         
-    def display_index_to_content_index(self, x, y, content: List[str]):
-        display_content = self.get_display_content_within_width(content)
-        
+    def display_index_to_content_index(self, x, y, display_content_packed: List[List[str]]):        
         target_height = x + 1
         sum_height = 0
-        for i, display_line in enumerate(display_content):
+        for i, display_line in enumerate(display_content_packed):
             cur_height = len(display_line)
             if sum_height + cur_height >= target_height:
                 start_line = target_height - sum_height - 1
-                content_x, content_y = i, start_line * self.width + y
+                content_x = i
+                content_y = y
+                for line_idx in range(start_line):
+                    content_y += len(display_line[line_idx])
                 return content_x, content_y
             sum_height += cur_height
             
@@ -194,7 +222,9 @@ class DisplayManager:
     
     
     def get_display_line_within_width(self, line: str) -> List[str]:
-        line_length = len(line)        
+        line_length = len(line)
+        if line_length == 0:
+            return [""]
         full_line_count = line_length // self.width
         
         line_list = [line[i*self.width:(i+1)*self.width] for i in range(full_line_count)]

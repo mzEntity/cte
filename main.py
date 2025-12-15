@@ -4,7 +4,7 @@ import shutil, os, sys
 from utils.cursor import Cursor, CursorPosition, cprint, enter_venv, leave_venv
 from utils.interactive import getch
 
-from layout.board import Editor
+from layout.editor import Editor
 
 class MyVim:
     def __init__(self, height: int, width: int, content: List[str]):
@@ -12,46 +12,37 @@ class MyVim:
         self._active = True
         self.editor = Editor(height, width, Cursor().position(), content)
         
+        self._init_operate_dict()
+        
+        
+    def _init_operate_dict(self):
         self._operate_dict = {
             'normal': {
                 'i': self._change_mode_to_insert,
                 'a': self._change_mode_to_insert,
                 'o': self._change_mode_to_insert,
-                ':': self._change_mode_to_command,
-                'other': self._normal_mode_func
+                ':': self._change_mode_to_command
             },
             'insert': {
                 'ESC': self._change_mode_to_normal,
-                'other': self._insert_mode_func
+                'UP': lambda: (self.editor.display_cursor_up(), self.editor.show_cursor()),
+                'LEFT': lambda: (self.editor.display_cursor_left(), self.editor.show_cursor()),
+                'DOWN': lambda: (self.editor.display_cursor_down(), self.editor.show_cursor()),
+                'RIGHT': lambda: (self.editor.display_cursor_right(), self.editor.show_cursor()),
+                'BACKSPACE': lambda: (self.editor.delete_char(), self.editor.show_cursor()),
+                'ENTER': lambda: (self.editor.insert_line(), self.editor.show_cursor())
             },
             'command': {
                 'ESC': self._change_mode_to_normal,
-                'q': self._exit,
-                'other': self._command_mode_func
+                'q': self._exit
             }
         }
-        
-    def _normal_mode_func(self, key):
-        pass
-    
-    def _insert_mode_func(self, key):
-        if key == 'UP':
-            self.editor.display_cursor_up()
-            self.editor.show_cursor()
-        elif key == 'LEFT':
-            self.editor.display_cursor_left()
-            self.editor.show_cursor()
-        elif key == 'DOWN':
-            self.editor.display_cursor_down()
-            self.editor.show_cursor()
-        elif key == 'RIGHT':
-            self.editor.display_cursor_right()
-            self.editor.show_cursor()
-        else:
-            cprint(key)
-    
-    def _command_mode_func(self, key):
-        pass
+        insertable_list = []
+        insertable_list.extend([chr(i) for i in range(ord('a'), ord('z')+1)])
+        insertable_list.extend([chr(i) for i in range(ord('A'), ord('Z')+1)])
+        insertable_list.extend([chr(i) for i in range(ord('0'), ord('9')+1)])
+        for c in insertable_list:
+            self._operate_dict['insert'][c] = lambda: (self.editor.insert_char(c), self.editor.show_cursor())
 
     def _change_mode_to_normal(self):
         self._mode = 'normal'
@@ -71,13 +62,8 @@ class MyVim:
         while self._active:
             operation_available = self._operate_dict[self._mode]
             ch, source = getch()
-            if ch == 'q':
-                break
             if ch in operation_available:
                 operation_available[ch]()
-            else:
-                operation_available['other'](ch)
-            # print(ch, self._mode)
 
 
 
