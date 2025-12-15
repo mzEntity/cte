@@ -5,12 +5,14 @@ from utils.cursor import Cursor, CursorPosition, cprint, enter_venv, leave_venv
 from utils.interactive import getch
 
 from layout.editor import Editor
+from layout.command import CommandLine
 
 class MyVim:
     def __init__(self, height: int, width: int, content: List[str]):
         self._mode = 'normal'
         self._active = True
-        self.editor = Editor(height, width, Cursor().position(), content)
+        self.editor = Editor(height-1, width, Cursor().position(), content)
+        self.command_line = CommandLine(1, width, Cursor().position().offset(height-1, 0))
         
         self._init_operate_dict()
         
@@ -21,7 +23,7 @@ class MyVim:
                 'i': self._change_mode_to_insert,
                 'a': self._change_mode_to_insert,
                 'o': self._change_mode_to_insert,
-                ':': self._change_mode_to_command
+                ':': self._change_mode_to_command,
             },
             'insert': {
                 'ESC': self._change_mode_to_normal,
@@ -34,17 +36,26 @@ class MyVim:
             },
             'command': {
                 'ESC': self._change_mode_to_normal,
-                'q': self._exit
+                'LEFT': lambda: (self.command_line.edit_cursor_left(), self.command_line.show_cursor()),
+                'RIGHT': lambda: (self.command_line.edit_cursor_right(), self.command_line.show_cursor()),
+                'BACKSPACE': lambda: (self.command_line.delete_command_char(), self.command_line.show_cursor()),
+                'ENTER': lambda: (self.execute_command(self.command_line.extract_command()), self.command_line.show_cursor())
             }
         }
-        insertable_list = []
+        insertable_list = [c for c in "!@#$%^&*()`~-_=+[{]}\\|;:'\",<.>/?"]
         insertable_list.extend([chr(i) for i in range(ord('a'), ord('z')+1)])
         insertable_list.extend([chr(i) for i in range(ord('A'), ord('Z')+1)])
         insertable_list.extend([chr(i) for i in range(ord('0'), ord('9')+1)])
         for c in insertable_list:
-            self._operate_dict['insert'][c] = lambda: (self.editor.insert_char(c), self.editor.show_cursor())
+            self._operate_dict['insert'][c] = lambda x=c: (self.editor.insert_char(x), self.editor.show_cursor())
+            self._operate_dict['command'][c] = lambda x=c: (self.command_line.insert_command_char(x), self.command_line.show_cursor())
+            
+    def execute_command(self, command_str):
+        if command_str == "!q":
+            self._exit()
 
     def _change_mode_to_normal(self):
+        self.command_line.clear_command()
         self._mode = 'normal'
         
     def _change_mode_to_insert(self):
@@ -52,6 +63,7 @@ class MyVim:
         self._mode = 'insert'
         
     def _change_mode_to_command(self):
+        self.command_line.show_cursor()
         self._mode = 'command'
         
     def _exit(self):

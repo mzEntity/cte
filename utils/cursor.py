@@ -20,6 +20,9 @@ class CursorPosition:
     def __init__(self, pos_x, pos_y):
         self.pos_x = pos_x
         self.pos_y = pos_y
+        
+    def offset(self, offset_x, offset_y):
+        return CursorPosition(self.pos_x + offset_x, self.pos_y + offset_y)
 
         
 def _cursor_up(n: int) -> str:
@@ -95,8 +98,6 @@ class Cursor:
             
         self._cursor_x += offset_x
         self._cursor_y += offset_y
-        
-        
         
     def show(self):
         print("\033[?25h", end="", flush=True)
