@@ -28,14 +28,16 @@ class MyVim:
             'insert': {
                 'ESC': self._change_mode_to_normal,
                 'UP': lambda: (self.editor.display_cursor_up(), self.editor.show_cursor()),
-                'LEFT': lambda: (self.editor.display_cursor_left(), self.editor.show_cursor()),
                 'DOWN': lambda: (self.editor.display_cursor_down(), self.editor.show_cursor()),
+                'LEFT': lambda: (self.editor.display_cursor_left(), self.editor.show_cursor()),
                 'RIGHT': lambda: (self.editor.display_cursor_right(), self.editor.show_cursor()),
                 'BACKSPACE': lambda: (self.editor.delete_char(), self.editor.show_cursor()),
                 'ENTER': lambda: (self.editor.insert_line(), self.editor.show_cursor())
             },
             'command': {
                 'ESC': self._change_mode_to_normal,
+                'UP': lambda: (self.command_line.history_pointer_up(), self.command_line.show_cursor()),
+                'DOWN': lambda: (self.command_line.history_pointer_down(), self.command_line.show_cursor()),
                 'LEFT': lambda: (self.command_line.edit_cursor_left(), self.command_line.show_cursor()),
                 'RIGHT': lambda: (self.command_line.edit_cursor_right(), self.command_line.show_cursor()),
                 'BACKSPACE': lambda: (self.command_line.delete_command_char(), self.command_line.show_cursor()),
