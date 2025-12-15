@@ -1,170 +1,216 @@
-from typing import List
+from typing import List, Optional, TypeAlias
 
 from utils.cursor import CursorPosition, Cursor, cprint, cnewline_indent
 
+char: TypeAlias = str
 
-class Board:
-    def __init__(self, height, width, position):
-        self.height = height
-        self.width = width
+class Editor:
+    def __init__(self, height, width, position: CursorPosition, content: Optional[List[str]]=None):
+        self._height = height
+        self._width = width
         
-        self.contents = []
-        for _ in range(self.height):
-            self.contents.append(" " * self.width)
-        self.start = CursorPosition(position[0], position[1])
+        if content is None:
+            content = [' ' * self._width for _ in range(self._height)]
+            
+        self._cm = ContentManager(content)
+        self._dm = DisplayManager(self._width)
+        self.update_display()
         
-        self.children = dict()
+        self._base = position
         
-    def show(self):
-        Cursor().goto(self.start)
-        for content in self.contents:
-            cprint(content)
-            cnewline_indent(self.start)
+        self._display_x_begin = 0
+        self._display_x_end = self._display_x_begin + self._height
+        
+        self._display_cursor_x = 0
+        self._display_cursor_y = 0
+        
     
-        for _, child in self.children.items():
-            child.show()
+    def update_display(self):
+        self._update_display_content()
+        self._update_padded_display_content()
+        
+        
+    def show_cursor(self):
+        Cursor().goto(self._base)
+        Cursor().move_offset(self._display_cursor_x - self._display_x_begin, self._display_cursor_y)
+        Cursor().show()
+        
+        
+    def _update_display_content(self):
+        self._display_content = [
+            line 
+            for split_result in self._dm.get_display_content_within_width(self._cm.get_content()) 
+            for line in split_result
+        ]
+        
+    def _update_padded_display_content(self):
+        self._padded_display_content = []
+        for line in self._display_content:
+            new_line = line[:]
+            if len(line) < self._width:
+                new_line += ' ' * (self._width - len(line))
+            self._padded_display_content.append(new_line)
+        if self._height > len(self._padded_display_content):
+            self._padded_display_content.extend([' ' * self._width] * (self._height - len(self._padded_display_content)))
             
         
-    def addChild(self, name, board):
-        self.children[name] = board
+    def show(self):
+        Cursor().goto(self._base)
+        display_list = self._padded_display_content[self._display_x_begin:self._display_x_end]
         
-        
-class Line:
-    def __init__(self, content, width):
-        self.width = width
-        self.content = [c for c in content]
-        self.updated = False
-        self.update_display(self.width)
-        
-    def height(self):
-        if not self.updated:
-            self.update_display(self.width)
-        return len(self.display_content)
-    
-    def get_line_idx(self, display_x, display_y):
-        return display_x * self.width + display_y
-        
-    def insert_char(self, idx, c):
-        if len(self.content) < idx:
-            self.content.extend([" "] * (idx - len(self.content)))
-        self.content.insert(idx, c)
-        self.updated = False
-    
-    def delete_char(self, idx):
-        if len(self.content) <= idx:
-            return
-        self.content.pop(idx)
-        self.updated = False
-        
-    def split_line(self, idx):
-        if len(self.content) <= idx:
-            return Line("", self.width)
-        split_content = self.content[idx:]
-        self.content = self.content[:idx]
-        self.updated = False
-        return Line(split_content, self.width)
-    
-    def combine_line(self, new_line):
-        self.content.extend(new_line.content)
-        self.updated = False
-        
-    def update_display(self, width):
-        content_length = len(self.content)
-        lines = content_length // width
-        display_content = [self.content[i*width:(i+1)*width] for i in range(lines)]
-        if content_length % width != 0:
-            display_content.append(self.content[lines*width:])
-        if len(display_content) == 0:
-            display_content.append([" "])
-        self.display_content = display_content
-        self.updated = True
-        
-    def print_display(self):
-        if not self.updated:
-            self.update_display(self.width)
-        for line in self.display_content:
-            print(''.join(line))
-        
-
-class ContentDisplayManager:
-    def __init__(self, height, width):
-        self.height = height
-        self.width = width
-        
-        self.raw_content: List[Line] = []
-    
-    def init_raw_content(self, raw_content):
-        self.raw_content = [Line(line[:], self.width) for line in raw_content]
-        
-    def display_index_to_content_index(self, x, y):
-        target_height = x + 1
-        cur_height = 0
-        for idx, line in enumerate(self.raw_content):
-            if cur_height + line.height() >= target_height:
-                remain = target_height - cur_height - 1
-                return idx, line.get_line_idx(remain, y)
-            else:
-                cur_height += line.height()
-        return len(self.raw_content) - 1 + (target_height - cur_height), y
-    
-
-    def insert_char(self, x, y, c):
-        cx, cy = self.display_index_to_content_index(x, y)
-        while len(self.raw_content) <= cx:
-            self.raw_content.append(Line("", self.width))
-        
-        target_line = self.raw_content[cx]
-        target_line.insert_char(cy, c)
-        
-        
-    def delete_char(self, x, y):
-        cx, cy = self.display_index_to_content_index(x, y)
-        if len(self.raw_content) <= cx:
-            return
-        target_line = self.raw_content[cx]
-        target_line.delete_char(cy)
-        
-    def display(self):
-        for line in self.raw_content:
-            line.print_display()
-
-        
-    def insert_line(self, x, y):
-        cx, cy = self.display_index_to_content_index(x, y)
-        while len(self.raw_content) < cx:
-            self.raw_content.append(Line("", self.width))
-        if cy == 0:
-            self.raw_content.insert(x, Line("", self.width))
+        for display_line in display_list:
+            cprint(display_line)
+            cnewline_indent(self._base)
+            
+            
+    def display_cursor_left(self):
+        if self._display_cursor_y > 0:
+            self._display_cursor_y -= 1
         else:
-            new_line = self.raw_content[cx].split_line(cy)
-            self.raw_content.insert(cx+1, new_line)
+            if self._display_cursor_x > 0:
+                self._display_cursor_x -= 1
+                self._display_cursor_y = len(self._display_content[self._display_cursor_x])
+                if self._display_cursor_x < self._display_x_begin:
+                    self._display_x_begin = self._display_cursor_x
+                    self._display_x_end = self._display_x_begin + self._height
+                    self.show()
+            
+            
+    def display_cursor_right(self):
+        if self._display_cursor_y < len(self._display_content[self._display_cursor_x]):
+            self._display_cursor_y += 1
+        else:
+            if self._display_cursor_x < len(self._display_content) - 1:
+                self._display_cursor_x += 1
+                self._display_cursor_y = 0
+                if self._display_cursor_x >= self._display_x_end:
+                    self._display_x_end = self._display_cursor_x + 1
+                    self._display_x_begin = self._display_x_end - self._height
+                    self.show()
+    
+    
+    def display_cursor_up(self):
+        if self._display_cursor_x > 0:
+            self._display_cursor_x -= 1
+            self._display_cursor_y = min(self._display_cursor_y, len(self._display_content[self._display_cursor_x]))
+            if self._display_cursor_x < self._display_x_begin:
+                self._display_x_begin = self._display_cursor_x
+                self._display_x_end = self._display_x_begin + self._height
+                self.show()
+            
+            
+    def display_cursor_down(self):
+        if self._display_cursor_x < len(self._display_content) - 1:
+            self._display_cursor_x += 1
+            self._display_cursor_y = min(self._display_cursor_y, len(self._display_content[self._display_cursor_x]))
+            if self._display_cursor_x >= self._display_x_end:
+                self._display_x_end = self._display_cursor_x + 1
+                self._display_x_begin = self._display_x_end - self._height
+                self.show()
+            
+        
+            
 
+
+class ContentManager:
+    def __init__(self, content: Optional[List[str]] = None):
+        if content is None:
+            content = [""]
+        self.init_content(content)
         
-    def delete_line(self, x):
-        cx, cy = self.display_index_to_content_index(x, 0)
-        if cx == 0 or cy != 0 or len(self.raw_content) <= cx:
-            return
-        self.raw_content[cx-1].combine_line(self.raw_content[cx])
-        self.raw_content.pop(cx)
+            
+    def init_content(self, content: List[str]):
+        self.content: List[List[char]] = [[c for c in line] for line in content]
         
+        
+    def insert_str(self, x: int, y: int, s: str):
+        if len(self.content) <= x:
+            raise ValueError(f"`x` out of bound: [0, {len(self.content)}). Got {x}")
+        if len(self.content[x]) < y:
+            raise ValueError(f"`y` out of bound: [0, {len(self.content[x])}]. Got {y}")
+        
+        self.content[x][y:y] = [c for c in s]
+        
+        
+    def delete_str(self, x: int, y: int, count: int):
+        if len(self.content) <= x:
+            raise ValueError(f"`x` out of bound: [0, {len(self.content)}). Got {x}")
+        if len(self.content[x]) < y:
+            raise ValueError(f"`y` out of bound: [0, {len(self.content[x])}]. Got {y}")
+        
+        remove_count = min(y, count)
+        del self.content[x][y-remove_count:y]
+            
+        
+    def insert_line(self, x: int, y: int):
+        if len(self.content) <= x:
+            raise ValueError(f"`x` out of bound: [0, {len(self.content)}). Got {x}")
+        if len(self.content[x]) < y:
+            raise ValueError(f"`y` out of bound: [0, {len(self.content[x])}]. Got {y}")
+        
+        new_line = self.content[x][y:]
+        self.content[x] = self.content[x][:y]
+        self.content.insert(x+1, new_line)
+        
+        
+    def combine_line(self, x: int):
+        if x >= len(self.content) or x <= 0:
+            raise ValueError(f"`x` out of bound: (0, {len(self.content)}). Got {x}")
+        self.content[x-1].extend(self.content[x])
+        del self.content[x]
+        
+    
+    def get_content(self) -> List[str]:
+        return [''.join(line) for line in self.content]
+        
+
+
+class DisplayManager:
+    def __init__(self, width: int):
+        self.width = width
+        
+        
+    def display_index_to_content_index(self, x, y, content: List[str]):
+        display_content = self.get_display_content_within_width(content)
+        
+        target_height = x + 1
+        sum_height = 0
+        for i, display_line in enumerate(display_content):
+            cur_height = len(display_line)
+            if sum_height + cur_height >= target_height:
+                start_line = target_height - sum_height - 1
+                content_x, content_y = i, start_line * self.width + y
+                return content_x, content_y
+            sum_height += cur_height
+            
+        return -1, -1
+    
+    
+    def get_display_content_within_width(self, content: List[str]) -> List[List[str]]:
+        line_list_list: List[List[str]] = []
+        for line in content:
+            line_list_list.append(self.get_display_line_within_width(line))
+        return line_list_list
+    
+    
+    def get_display_line_within_width(self, line: str) -> List[str]:
+        line_length = len(line)        
+        full_line_count = line_length // self.width
+        
+        line_list = [line[i*self.width:(i+1)*self.width] for i in range(full_line_count)]
+        if line_length % self.width != 0:
+            final_line = line[full_line_count*self.width:]
+            line_list.append(final_line)
+        return line_list
+    
+
+      
 if __name__ == "__main__":
     file_path = "test/test_file1.txt"
     with open(file_path, "r") as f:
-        content = [line.strip() for line in f.readlines()]
+        content = [line.rstrip() for line in f.readlines()]
+    # print(content)
+    b = Editor(10, 100, Cursor().position(), content)
     
-    cdm = ContentDisplayManager(100, 100)
-    cdm.init_raw_content(content)
-    cdm.display()
-    
-    print("========================================")
-    
-    cdm.insert_char(0, 9, 'a')
-    cdm.insert_char(1, 0, 'c')
-    cdm.insert_char(1, 0, 'b')
-    
-    cdm.delete_char(0, 10)
-    cdm.insert_line(1, 1)
-    # cdm.insert_char(0, 9, 'a')
-    cdm.delete_line(3)
-    cdm.display()
-    
+    b.show()
+    print("===============")
