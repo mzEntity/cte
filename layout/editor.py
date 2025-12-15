@@ -10,7 +10,7 @@ class Editor:
         self._width = width
         
         if content is None:
-            content = [' ' * self._width for _ in range(self._height)]
+            content = ['']
             
         self._cm = ContentManager(content)
         self._dm = DisplayManager(self._width)
@@ -138,6 +138,9 @@ class Editor:
         self.display_cursor_right()
         self.show()
         
+    def get_content(self):
+        return self._cm.get_content()
+        
 
 class ContentManager:
     def __init__(self, content: Optional[List[str]] = None):
@@ -223,6 +226,7 @@ class DisplayManager:
     
     def get_display_line_within_width(self, line: str) -> List[str]:
         line_length = len(line)
+        # at least one line
         if line_length == 0:
             return [""]
         full_line_count = line_length // self.width

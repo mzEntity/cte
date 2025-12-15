@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 import shutil, os, sys
 
 from utils.cursor import Cursor, CursorPosition, cprint, enter_venv, leave_venv
@@ -8,11 +8,13 @@ from layout.editor import Editor
 from layout.command import CommandLine
 
 class MyVim:
-    def __init__(self, height: int, width: int, content: List[str]):
+    def __init__(self, height: int, width: int, content: Optional[List[str]], args):
         self._mode = 'normal'
         self._active = True
         self.editor = Editor(height-1, width, Cursor().position(), content)
         self.command_line = CommandLine(1, width, Cursor().position().offset(height-1, 0))
+        
+        self.file_path = args.file_path
         
         self._init_operate_dict()
         
@@ -44,7 +46,7 @@ class MyVim:
                 'ENTER': lambda: (self.execute_command(self.command_line.extract_command()), self.command_line.show_cursor())
             }
         }
-        insertable_list = [c for c in "!@#$%^&*()`~-_=+[{]}\\|;:'\",<.>/?"]
+        insertable_list = [c for c in "!@#$%^&*()`~-_=+[{]}\\|;:'\",<.>/? "]
         insertable_list.extend([chr(i) for i in range(ord('a'), ord('z')+1)])
         insertable_list.extend([chr(i) for i in range(ord('A'), ord('Z')+1)])
         insertable_list.extend([chr(i) for i in range(ord('0'), ord('9')+1)])
@@ -54,6 +56,11 @@ class MyVim:
             
     def execute_command(self, command_str):
         if command_str == "!q":
+            self._exit()
+        elif command_str == "!w":
+            self._save()
+        elif command_str == "!wq":
+            self._save()
             self._exit()
 
     def _change_mode_to_normal(self):
@@ -70,6 +77,12 @@ class MyVim:
         
     def _exit(self):
         self._active = False
+        
+    def _save(self):
+        content = self.editor.get_content()
+        with open(self.file_path, "w", encoding="utf-8") as f:
+            for line in content:
+                f.write(line + "\n")
 
     def work(self):
         self.editor.show()
@@ -79,19 +92,32 @@ class MyVim:
             if ch in operation_available:
                 operation_available[ch]()
 
+import argparse
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Hello MyVim.")
+    parser.add_argument("file_path", help="file to open")
+    args = parser.parse_args()
+    return args
 
 if __name__ == "__main__":
+    args  = parse_args()
+    file_path = args.file_path
+    if os.path.isdir(file_path):
+        raise ValueError(f"`{file_path}` is a folder.")
+    
+    content = None
+    if os.path.exists(file_path):
+        with open(file_path, "r") as f:
+            content = [line.rstrip() for line in f.readlines()]
+        
     enter_venv()
     
     size = shutil.get_terminal_size()
     columns = size.columns
     lines = size.lines
     
-    file_path = "test/test_file2.txt"
-    with open(file_path, "r") as f:
-        content = [line.rstrip() for line in f.readlines()]
-    vim = MyVim(lines, columns, content)
+    vim = MyVim(lines, columns, content, args)
     vim.work()
     
     leave_venv()
